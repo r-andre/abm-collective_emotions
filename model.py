@@ -28,11 +28,14 @@ class Model:
         them in its field, adjusting its emotional state accordingly.
         '''
         for step in range(time_steps): # For each step in time...
-            for agent in self.agent_list: # ...each agent...
-                exprn = agent.expression() # ...may express its emotions
-                if exprn: # If an agent expresses its emotions...
-                    self.field.communication(exprn) # ...it stores them...
-                                                    # ...in the field
+            for agent in self.agent_list: # ...each agent perceives the
+                                          # communication field and may
+                                          # express its emotions
+                agent.perception(self.field.variable)
+                exprn = agent.expression()
+                if exprn: # If an agent expresses its emotions, it stores
+                          # them in the communication field
+                    self.field.communication(exprn)
                 else:
                     pass
                 agent.relaxation() # At the end of each time step the emotions
