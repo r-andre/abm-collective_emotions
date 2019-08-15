@@ -22,6 +22,18 @@ agents = 1 # ...agents in the model
 time_steps = 10 # ...time steps the each model run goes through
 model_runs = 1 # ...model runs
 
+####################
+# MODEL PARAMETERS #
+####################
+
+amplitude = 1
+arousal_threshold = 0.5
+emotional_charge = 0.2
+decay_agent = 0.1
+decay_field = 0.1
+constant = 0.6
+impact_field = 0.1
+
 #####################
 # RUNNING THE MODEL #
 #####################
