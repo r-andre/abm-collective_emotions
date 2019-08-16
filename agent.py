@@ -7,7 +7,6 @@ Implementing the Cyberemotions Framework
 agent.py
 '''
 
-import random
 import numpy as np
 
 class Agent:
@@ -17,18 +16,19 @@ class Agent:
     whether their emotional state is positive or negative, while arousal
     indicates the strength of that emotion.
     '''
-    def __init__(self, amplitude, threshold, constant, decay):
-        self.vbsln = 0.1
-        self.absln = 0.1
-        self.vlnc = self.vbsln
-        self.arsl = self.absln
-        self.ampltd = amplitude
-        self.thrshld = threshold # Arousal threshold that determines if/when an
-                                     # agent communicates its emotions
-        self.cnstnt = constant
-        self.dcy = decay
+    def __init__(self, Baselines, Threshold):
+        self.id = None # Stores the agent id number assigned by the model
+        self.v_baseline = Baselines[0] # Constant valence baseline
+        self.a_baseline = Baselines[1] # Constant arousal baseline
+        self.valence = self.v_baseline # Sets the initial valence and arousal
+        self.arousal = self.a_baseline # to the baseline values
+        self.threshold = np.random.uniform(Threshold[0], # Arousal threshold
+                                           Threshold[1]) # determined by an
+                                                         # uniform distribution
+        self.v_history = []
+        self.a_history = []
 
-    def perception(self, field):
+    def perception(self, Field, V_coefficient, A_coefficient, Amplitude):
         '''
         This method describes how agents perceive their field, how the field
         affects their emotional states, and returns the changed emotion
@@ -36,19 +36,27 @@ class Agent:
         represented by a random number. The impact of the latter is determined
         by the amplitude parameter of the agent.
         '''
-        x = 1
-        y = 1
-        Fv = field * (x + x * self.vlnc + x * self.vlnc ** 2 + x * self.vlnc ** 3)
-        Fa = field * (y + y * self.arsl + y * self.arsl ** 2 + y * self.arsl ** 3)
+        v_change = Field * (V_coefficient[0]
+                            + V_coefficient[1] * self.valence
+                            + V_coefficient[2] * self.valence ** 2
+                            + V_coefficient[3] * self.valence ** 3)
+        a_change = Field * (A_coefficient[0]
+                            + A_coefficient[1] * self.arousal
+                            + A_coefficient[2] * self.arousal ** 2
+                            + A_coefficient[3] * self.arousal ** 3)
 
-        stochasticity = random.randint(-100, 100) / 100
+        v_stochasticity = np.random.randint(-100, 100) / 100 * Amplitude[0]
+        a_stochasticity = np.random.randint(-100, 100) / 100 * Amplitude[1]
 
-        self.vlnc = Fv + self.ampltd * stochasticity
-        self.arsl = Fa + self.ampltd * stochasticity
-        # Equations describing how valence and arousal are affect by field
-        # variable and stochastic factors
+        self.valence = v_change + self.valence * v_stochasticity
+        self.arousal = a_change + self.arousal * a_stochasticity
+        # Equations describing how valence and arousal are affected by the
+        # field variable and stochastic factors
+        
+        self.v_history.append(round(self.valence, 2))
+        self.a_history.append(round(self.arousal, 2))
 
-    def expression(self):
+    def expression(self, Down_regulation):
         '''
         This method describes the information agents express to the field and
         when. When their arousal reaches their internal threshold value, they
@@ -57,10 +65,12 @@ class Agent:
         this by storing the information in the expression variable, their
         valence and arousal are both immediately down-regulated.
         '''
-        if self.arsl >= self.thrshld:
-            expression = np.sign(self.vlnc)
-            self.vlnc = (self.vlnc - self.vbsln) * self.cnstnt + self.vbsln
-            self.arsl = (self.arsl - self.absln) * self.cnstnt + self.absln
+        if self.arousal >= self.threshold:
+            expression = np.sign(self.valence)
+            self.valence = (self.valence - self.v_baseline) \
+                           * Down_regulation + self.v_baseline
+            self.arousal = (self.arousal - self.a_baseline) \
+                           * Down_regulation + self.a_baseline
             # Equations describing an immediate down-regulation of valence and
             # arousal after an emotional expression
         else:
@@ -71,15 +81,15 @@ class Agent:
         return expression # Returning the expression variable or None when the
                           # arousal did not exceed the threshold
 
-    def relaxation(self):
+    def relaxation(self, Decay):
         '''
         This methods describes how the the emotional state of agents relaxes
         towards its baseline over time according to the internal decay
         paramater, independently of whether or not an emotion was expressed.
         '''
-        regression_v = (-1) * self.dcy * (self.vlnc - self.vbsln)
-        regression_a = (-1) * self.dcy * (self.arsl - self.absln)
-        self.vlnc = self.vlnc + regression_v
-        self.arsl = self.arsl + regression_a
+        v_regression = (-1) * Decay[0] * (self.valence - self.v_baseline)
+        a_regression = (-1) * Decay[1] * (self.arousal - self.a_baseline)
+        self.valence = self.valence + v_regression
+        self.arousal = self.arousal + a_regression
         # Equations of how valence and arousal regress over time using the
         # decay parameter

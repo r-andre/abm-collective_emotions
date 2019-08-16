@@ -16,26 +16,28 @@ class Field:
     emotional charge of the field, its impact on agents, and the decay of this
     impact over time.
     '''
-    def __init__(self, charge, decay, impact):
-        self.fld = charge # Field variable storing the emotional charge
-                              # of the field
-        self.dcy = decay # Constant decay parameter that determines the
-                             # decrease of the field variable over time
-        self.impct = impact # Constant determining the impact of the field
-                               # on the agents
+    def __init__(self, Charge, Decay, Impact):
+        self.charge = Charge # Field variable storing the emotional
+                                   # charge of the field
+        self.positivity = None
+        self.negativity = None
+        self.decay = Decay # Constant decay parameter that determines the
+                                 # decrease of the field variable over time
+        self.impact = Impact # Parameter determining the impact of the
+                                   # field on the agents
 
-    def communication(self, positive_expressions, negative_expressions):
+    def communication(self, Positive_expressions, Negative_expressions):
         '''
         This methods describes how the field variable changes depending on
         user participation and the emotional information they put in. It takes
         two lists of agent expression variables as input, namely a list of all
         positive expressions and a list of all negative expressions.
         '''
-        pos_exp = len(positive_expressions)
-        neg_exp = len(negative_expressions)
+        positive_e = len(Positive_expressions) # Total number of all positive
+        negative_e = len(Negative_expressions) # and negative expressions
 
-        pos_fld = self.impct * pos_exp - self.dcy * self.fld
-        neg_fld = self.impct * neg_exp - self.dcy * self.fld
-        self.fld = pos_fld + neg_fld
+        self.positivity = self.impact * positive_e - self.decay * self.charge
+        self.negativity = self.impact * negative_e - self.decay * self.charge
+        self.charge = self.positivity + self.negativity
         # Calculating the new field variable using the total number of agent
         # expressions and the decay and impact parameters

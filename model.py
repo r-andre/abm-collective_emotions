@@ -13,31 +13,64 @@ import field as fld
 class Model:
     '''
     Each instance of this class describes one model run. It initializes by
-    creating a list of agents and a communication field.
+    creating a list of agents (and assigning them unique id numbers), and a
+    communication field.
     '''
-    def __init__(self, agents): # The Model instance initializes the set
-                                # number of agents and one instance of the
-                                # communication field
-        self.agent_list = [agt.Agent() for agent in range(agents)]
-        self.field = fld.Field()
+    def __init__(self,
+                 Agents,
+                 Agent_baseline,
+                 Agent_threshold,
+                 Field_charge,
+                 Field_decay,
+                 Field_impact):
+        self.agent_list = [agt.Agent(Agent_baseline,
+                           Agent_threshold) for agent in range(Agents)]
+        self.field = fld.Field(Field_charge, Field_decay, Field_impact)
 
-    def run(self, time_steps):
+        agents_all = list(range(0, Agents))
+        for agent in self.agent_list:
+            agent.id = agents_all.pop(0)
+#            print(agent.id)
+
+    def run(self,
+            time_steps,
+            Valence_coefficient,
+            Arousal_coefficient,
+            Agent_amplitude,
+            Agent_down_regulation,
+            Agent_decay):
         '''
         This method runs the model instance using the given settings. At every
-        step, each agent may or may not communicate its emotions by storing
-        them in its field, adjusting its emotional state accordingly.
+        step, each agent may or may not communicate its emotions by expressing
+        them and storing them in the field, and then adjusting its emotional
+        state accordingly. Afterwards, the field takes action by calculating
+        its new emotional charge given previous agent expressions.
         '''
-        for step in range(time_steps): # For each step in time...
-            for agent in self.agent_list: # ...each agent perceives the
-                                          # communication field and may
-                                          # express its emotions
-                agent.perception(self.field.variable)
-                exprn = agent.expression()
-                if exprn: # If an agent expresses its emotions, it stores
-                          # them in the communication field
-                    self.field.communication(exprn)
+
+        for step in range(time_steps):
+            positive_expressions = []
+            negative_expressions = []
+
+            for agent in self.agent_list:
+                agent.perception(self.field.charge,
+                                 Valence_coefficient,
+                                 Arousal_coefficient,
+                                 Agent_amplitude)
+                agent_emotion = agent.expression(Agent_down_regulation)
+
+                if agent_emotion == 1:
+                    positive_expressions.append(agent_emotion)
+                elif agent_emotion == -1:
+                    negative_expressions.append(agent_emotion)
                 else:
                     pass
-                agent.relaxation() # At the end of each time step the emotions
-                                   # of each agent regress towards a baseline
-            print(step)
+
+                agent.relaxation(Agent_decay)
+
+            self.field.communication(positive_expressions, negative_expressions)
+
+            print("Step " + str(step) + " successful!")
+        for agent in self.agent_list:
+            print("Agent " + str(agent.id) + " history:")
+            print(agent.v_history)
+
