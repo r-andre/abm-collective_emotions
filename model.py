@@ -7,6 +7,8 @@ Implementing the Cyberemotions Framework
 model.py
 '''
 
+import pandas as pd
+import matplotlib.pyplot as plt
 import agent as agt
 import field as fld
 
@@ -26,6 +28,9 @@ class Model:
         self.agent_list = [agt.Agent(Agent_baseline,
                            Agent_threshold) for agent in range(Agents)]
         self.field = fld.Field(Field_charge, Field_decay, Field_impact)
+        
+        self.data_v = []
+        self.data_a = []
 
         agents_all = list(range(0, Agents))
         for agent in self.agent_list:
@@ -69,8 +74,26 @@ class Model:
 
             self.field.communication(positive_expressions, negative_expressions)
 
-            print("Step " + str(step) + " successful!")
-        for agent in self.agent_list:
-            print("Agent " + str(agent.id) + " history:")
-            print(agent.v_history)
+#            print("Step " + str(step) + " successful!")
 
+        self.data_list_v = []
+        self.data_list_a = []
+
+        for agent in self.agent_list:
+#            print("Agent " + str(agent.id) + " valence history:")
+#            print(agent.v_history)
+#            print("Agent " + str(agent.id) + " arousal history:")
+#            print(agent.a_history)
+
+            self.data_v.append(agent.v_history)
+            self.data_a.append(agent.a_history)
+
+        valence_data = pd.DataFrame(self.data_v)
+        arousal_data = pd.DataFrame(self.data_a)
+
+#        print(valence_data)
+#        print(arousal_data)
+
+        plt.figure()
+        valence_data.transpose().plot()
+        arousal_data.transpose().plot()
