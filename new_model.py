@@ -109,9 +109,8 @@ class Field:
                                 - FIELD_DECAY * self.positive_charge)
         self.negative_charge = (FIELD_IMPACT * negative_number
                                 - FIELD_DECAY * self.negative_charge)
-        print(self.positive_charge)
-        print(self.negative_charge)
         self.charge = self.positive_charge + self.negative_charge
+        print(self.charge)
 
     def data_collection(self):
         self.field_history.append(round(self.charge, 2))
@@ -144,15 +143,15 @@ def start_simulation(time):
     field_data = pd.DataFrame(f_list)
 
 #    plt.figure()
-    valence_plot = valence_data.transpose().plot(color="purple")
+    valence_plot = valence_data.transpose().plot(color="#1f77b4")
     valence_plot.set(xlabel="Time".capitalize())
     valence_plot.legend(["Agent valence"])
 
-    arousal_plot = arousal_data.transpose().plot(color="orange")
+    arousal_plot = arousal_data.transpose().plot(color="#d62728")
     arousal_plot.set(xlabel="Time".capitalize())
     arousal_plot.legend(["Agent arousal"])
 
-    field_plot = field_data.transpose().plot(color="green")
+    field_plot = field_data.transpose().plot(color="#2ca02c")
     field_plot.set(xlabel="Time".capitalize())
     field_plot.legend(["Field charge"])
 #    valence_data.transpose().plot(color="purple").legend(["Agent valence"])
