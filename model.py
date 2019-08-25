@@ -199,11 +199,6 @@ def start_simulation(time):
 
     data = {"valence": v_data, "arousal": a_data, "field": f_data}
 
-    return data
-
-def visualize_data(data):
-    
-
     valence_plot = data["valence"].transpose().plot(color="#1f77b4")
     valence_plot.set(xlabel="Time".capitalize())
     valence_plot.legend(["Agent valence"])
@@ -216,5 +211,8 @@ def visualize_data(data):
     field_plot.set(xlabel="Time".capitalize())
     field_plot.legend(["Field charge"])
 
-data = start_simulation(TIME)
-visualize_data(data)
+#####################
+# RUNNING THE MODEL #
+#####################
+
+start_simulation(TIME)
