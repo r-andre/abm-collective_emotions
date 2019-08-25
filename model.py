@@ -8,92 +8,213 @@ model.py
 '''
 
 import pandas as pd
-import matplotlib.pyplot as plt
-import agent as agt
-import field as fld
+import numpy as np
 
-class Model:
+############
+# SETTINGS #
+############
+
+TIME = 20
+
+VALENCE_BASE = 0.2 # b
+AROUSAL_BASE = 0.2 # d
+AR_THRESHOLD = 0.3 # tau
+
+EXPRESSIONS_POSITIVE = 15
+EXPRESSIONS_NEGATIVE = 4
+
+##############
+# PARAMETERS #
+##############
+
+AGENT_DECAY = [0.3, # gamma_v
+               0.9] # gamma_a
+AGENT_AMP = [0.3, # A_v
+             0.3] # A_a
+DOWN_REG = 0.4 # k
+VALENCE_COEFF = [0,  # b_0
+                 1,  # b_1
+                 0,  # b_2
+                 -1] # b_3
+AROUSAL_COEFF = [0.05, # d_0
+                 0.5,  # d_1
+                 0.5,  # d_2
+                 0.5]  # d_3
+
+FIELD_CHARGE = 0   # h
+FIELD_DECAY = 0.7  # gamma_h
+FIELD_IMPACT = 0.1 # s
+
+############
+# ENTITIES #
+############
+
+class Agent:
     '''
-    Each instance of this class describes one model run. It initializes by
-    creating a list of agents (and assigning them unique id numbers), and a
-    communication field.
+    Each agent represents one forum user and is defined by its emotional state
+    that is stored in the valence and arousal variables. Valence indicates
+    whether their emotional state is positive or negative, while arousal
+    indicates the strength of that emotion.
     '''
-    def __init__(self,
-                 Agents,
-                 Agent_baseline,
-                 Agent_threshold,
-                 Field_charge,
-                 Field_decay,
-                 Field_impact):
-        self.agent_list = [agt.Agent(Agent_baseline,
-                           Agent_threshold) for agent in range(Agents)]
-        self.field = fld.Field(Field_charge, Field_decay, Field_impact)
-        
-        self.data_v = []
-        self.data_a = []
+    def __init__(self):
+        self.identity = None
+        self.valence = VALENCE_BASE
+        self.arousal = AROUSAL_BASE
+        self.threshold = AR_THRESHOLD
+        self.valence_history = []
+        self.arousal_history = []
 
-        agents_all = list(range(0, Agents))
-        for agent in self.agent_list:
-            agent.id = agents_all.pop(0)
-#            print(agent.id)
-
-    def run(self,
-            time_steps,
-            Valence_coefficient,
-            Arousal_coefficient,
-            Agent_amplitude,
-            Agent_down_regulation,
-            Agent_decay):
+    def perception(self, field):
         '''
-        This method runs the model instance using the given settings. At every
-        step, each agent may or may not communicate its emotions by expressing
-        them and storing them in the field, and then adjusting its emotional
-        state accordingly. Afterwards, the field takes action by calculating
-        its new emotional charge given previous agent expressions.
+        This method describes how agents perceive their field, how the field
+        affects their emotional states, and returns the changed emotion
+        variable given the input field variable and a stochastic component
+        represented by a random number. The impact of the latter is determined
+        by the amplitude parameter of the agent.
         '''
+        v_change = field * (VALENCE_COEFF[0]
+                            + VALENCE_COEFF[1] * self.valence
+                            + VALENCE_COEFF[2] * self.valence ** 2
+                            + VALENCE_COEFF[3] * self.valence ** 3)
+        a_change = np.sign(field) * (AROUSAL_COEFF[0]
+                                     + AROUSAL_COEFF[1] * self.arousal
+                                     + AROUSAL_COEFF[2] * self.arousal ** 2
+                                     + AROUSAL_COEFF[3] * self.arousal ** 3)
 
-        for step in range(time_steps):
-            positive_expressions = []
-            negative_expressions = []
+#        v_stoch = AGENT_AMP[0] * np.random.randint(-100, 100) / 100
+#        a_stoch = AGENT_AMP[1] * np.random.randint(-100, 100) / 100
 
-            for agent in self.agent_list:
-                agent.perception(self.field.charge,
-                                 Valence_coefficient,
-                                 Arousal_coefficient,
-                                 Agent_amplitude)
-                agent_emotion = agent.expression(Agent_down_regulation)
+        self.valence = v_change + self.valence# + v_stoch
+        self.arousal = a_change + self.arousal# + a_stoch
+        # CLARIFY: Possibly remove self.valence/arousal?
 
-                if agent_emotion == 1:
-                    positive_expressions.append(agent_emotion)
-                elif agent_emotion == -1:
-                    negative_expressions.append(agent_emotion)
-                else:
-                    pass
+    def expression(self):
+        '''
+        This method describes the information agents express to the field and
+        when. When their arousal reaches their internal threshold value, they
+        communicate the sign of their valence, the information whether they
+        are in a positive or negative emotional state. After they communicate
+        this by storing the information in the expression variable, their
+        valence and arousal are both immediately down-regulated.
+        '''
+        if self.arousal >= self.threshold:
+            emotion = np.sign(self.valence)
+            self.valence = (self.valence - VALENCE_BASE) \
+                           * DOWN_REG + VALENCE_BASE
+            self.arousal = (self.arousal - AROUSAL_BASE) \
+                           * DOWN_REG + AROUSAL_BASE
+        else:
+            emotion = None
 
-                agent.relaxation(Agent_decay)
+        return emotion
 
-            self.field.communication(positive_expressions, negative_expressions)
+    def relaxation(self):
+        '''
+        This methods describes how the the emotional state of agents relaxes
+        towards its baseline over time according to the internal decay
+        paramater, independently of whether or not an emotion was expressed.
+        '''
+        v_relax = (-1) * AGENT_DECAY[0] * (self.valence - VALENCE_BASE)
+        a_relax = (-1) * AGENT_DECAY[1] * (self.arousal - AROUSAL_BASE)
+        self.valence += v_relax
+        self.arousal += a_relax
 
-#            print("Step " + str(step) + " successful!")
+    def data_collection(self):
+        self.valence_history.append(round(self.valence, 2))
+        self.arousal_history.append(round(self.arousal, 2))
 
-        self.data_list_v = []
-        self.data_list_a = []
+class Field:
+    '''
+    Each communication field allows the agents of the model to communicate
+    with each other by storing their emotional expressions. Fields represent
+    discussion threads that forum users can participate in, one at a time, and
+    that affect their emotional state. It requires the input of the initial
+    emotional charge of the field, its impact on agents, and the decay of this
+    impact over time.
+    '''
+    def __init__(self):
+        self.charge = FIELD_CHARGE
+        self.positive_charge = 0
+        self.negative_charge = 0
+        self.field_history = [self.charge]
 
-        for agent in self.agent_list:
-#            print("Agent " + str(agent.id) + " valence history:")
-#            print(agent.v_history)
-#            print("Agent " + str(agent.id) + " arousal history:")
-#            print(agent.a_history)
+    def communication(self, time):
+        '''
+        This methods describes how the field variable changes depending on
+        user participation and the emotional information they put in. It takes
+        two lists of agent expression variables as input, namely a list of all
+        positive expressions and a list of all negative expressions.
+        '''
+        if time < 1:
+            positive_number = EXPRESSIONS_POSITIVE
+            negative_number = EXPRESSIONS_NEGATIVE
+        else:
+            positive_number = 0
+            negative_number = 0
 
-            self.data_v.append(agent.v_history)
-            self.data_a.append(agent.a_history)
+        self.positive_charge = (FIELD_IMPACT * positive_number
+                                - FIELD_DECAY * self.positive_charge)
+        self.negative_charge = (FIELD_IMPACT * negative_number
+                                - FIELD_DECAY * self.negative_charge)
+        self.charge = self.positive_charge# + self.negative_charge
 
-        valence_data = pd.DataFrame(self.data_v)
-        arousal_data = pd.DataFrame(self.data_a)
+    def data_collection(self):
+        self.field_history.append(round(self.charge, 2))
 
-#        print(valence_data)
-#        print(arousal_data)
+############
+# SCHEDULE #
+############
 
-        plt.figure()
-        valence_data.transpose().plot()
-        arousal_data.transpose().plot()
+def start_simulation(time):
+    '''
+    This function runs the model using the given settings. At every time step,
+    each agent may or may not communicate its emotions by expressing them and
+    storing them in the field, and then adjusting its emotional state
+    accordingly. Afterwards, the field takes action by calculating its new
+    emotional charge given previous agent expressions. The output of the
+    function is a list of dataframes containing the individual valence and
+    arousal histories of the agents and the field charge history.
+    '''
+    agent = Agent()
+    field = Field()
+
+    for step in range(time):
+        agent.perception(field.charge)
+        agent.data_collection()
+        agent.relaxation()
+        field.communication(step)
+        field.data_collection()
+
+    v_list = []
+    a_list = []
+    f_list = []
+
+    v_list.append(agent.valence_history)
+    a_list.append(agent.arousal_history)
+    f_list.append(field.field_history)
+
+    v_data = pd.DataFrame(v_list)
+    a_data = pd.DataFrame(a_list)
+    f_data = pd.DataFrame(f_list)
+
+    data = {"valence": v_data, "arousal": a_data, "field": f_data}
+
+    return data
+
+def visualize_data(data):
+    
+
+    valence_plot = data["valence"].transpose().plot(color="#1f77b4")
+    valence_plot.set(xlabel="Time".capitalize())
+    valence_plot.legend(["Agent valence"])
+
+    arousal_plot = data["arousal"].transpose().plot(color="#d62728")
+    arousal_plot.set(xlabel="Time".capitalize())
+    arousal_plot.legend(["Agent arousal"])
+
+    field_plot = data["field"].transpose().plot(color="#2ca02c")
+    field_plot.set(xlabel="Time".capitalize())
+    field_plot.legend(["Field charge"])
+
+data = start_simulation(TIME)
+visualize_data(data)
