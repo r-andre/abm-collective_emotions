@@ -253,4 +253,5 @@ def analyze_data(data):
 #    field_plot.legend(["Field charge"])
 
 # Running the model and illustrating its results:
-analyze_data(start_simulation(TIME, AGENTS))
+if __name__ == "__main__":
+	analyze_data(start_simulation(TIME, AGENTS))
