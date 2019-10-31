@@ -84,8 +84,10 @@ class Agent:
         # execute during first test runs due to an "result too large" error.
 
         # Stochastic shocks triggering agent interaction:
-        self.valence += AMP_V * np.random.randint(-100, 100) / 100
-        self.arousal += AMP_A * np.random.randint(-100, 100) / 100
+        stoch_v = np.random.randint(-100, 100) / 100
+        stoch_a = np.random.randint(-100, 100) / 100
+        self.valence += AMP_V * stoch_v
+        self.arousal += AMP_A * stoch_a
 
     def expression(self):
         '''Method checking if an agent expresses its emotions, down-regulating
@@ -171,6 +173,8 @@ def start_simulation(time, agents):
     histories_a = []
     history_f = []
     history_n = []
+    history_pn = []
+    history_nn = []
     history_agents = []
 
     # The simulation ends when all the agents dropped out, or when the maximum
@@ -216,7 +220,8 @@ def start_simulation(time, agents):
         # After all the agents took their actions, the field is now updated:
         field.communication(positive_expressions, negative_expressions)
         field.collect_data()
-        history_n.append(positive_expressions + negative_expressions)
+        history_pn.append(positive_expressions)
+        history_nn.append(negative_expressions)
         history_agents.append(len(agent_list))
 
     # All the individual agent histories are now stored in one large list:
@@ -225,6 +230,8 @@ def start_simulation(time, agents):
         histories_a.append(agent.history_a)
 
     history_f.append(field.history)
+    history_n.append(history_pn)
+    history_n.append(history_nn)
 
     # Creating a dictionary of agent and field data and respective dataframes:
     data = {"valence": pd.DataFrame(histories_v),
@@ -243,14 +250,28 @@ def analyze_data(data):
 #    valence_plot.legend(["Agent valence"])
 
     arousal_plot = data["arousal"].mean().transpose().plot(color="#d62728")
-    arousal_plot.set(xlabel="Time".capitalize())
+#    arousal_plot.set(xlabel="Time".capitalize())
     arousal_plot.legend(["Agent valence", "Agent arousal"])
     # Note: Cannot figure out why in this case both valence and arousal are
     # only part of the same plot when using mean() before transpose().
     plt.figure()
-#    field_plot = data["field"].transpose().plot(color="#2ca02c")
+
+    field_plot = data["field"].transpose().plot(color="#2ca02c")
 #    field_plot.set(xlabel="Time".capitalize())
-#    field_plot.legend(["Field charge"])
+    field_plot.legend(["Field charge"])
+    plt.figure()
+
+    n_positive_plot = data["expressions"].loc[0].transpose().plot(color="#1f77b4")
+    n_positive_plot.set(xlabel="Time".capitalize())
+    n_negative_plot = data["expressions"].loc[1].transpose().plot(color="#d62728")
+#    n_negative_plot.set(xlabel="Time".capitalize())
+    n_negative_plot.legend(["Positive expressions", "Negative expressions"])
+    plt.figure()
+
+    agents_plot = data["agents"].plot(color="#2ca02c")
+    agents_plot.legend(["Number of agents"])
+    plt.figure()
+
 
 # Running the model and illustrating its results:
 if __name__ == "__main__":
