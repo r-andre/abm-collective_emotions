@@ -7,20 +7,34 @@ Implementing the Cyberemotions Framework
 model.py
 '''
 
+import sys
+import time
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 
 ############
 # SETTINGS #
 ############
 
-TIME = 100 # Maximum number of time steps before the simulation ends
-AGENTS = 150 # Number of agents at the start of the simulation
+# Checking if there are arguments given and adjusting the settings accordingly:
+if len(sys.argv) > 2:
+    no_runs = int(sys.argv[1])
+    no_agents = int(sys.argv[2])
+    no_steps = 150
+else:
+    no_runs = 1 # Running the model once by default
+    no_agents = 150 # Arbitrary value
+    no_steps = 150 # Test runs rarely showed a model running for more than 100
+                   # times steps, and hence this should be an appropriate
+                   # maximum that does not cause premature abortion of a run
 
-##############
-# PARAMETERS #
-##############
+MODEL_RUNS = no_runs # Number of times the model is run
+AGENTS = no_agents # Number of agents at the start of the simulation
+TIME = no_steps # Maximum number of time steps before the simulation ends
+
+####################
+# MODEL PARAMETERS #
+####################
 
 BASE_V = 0.056 # Valence baseline ... b
 BASE_A = -0.442 # Arousal baseline ... d
@@ -46,10 +60,17 @@ COEFF_D3 = 0  # Arousal coefficient ... d_3
 
 CHARGE_H = 0 # Initial charge of the field ... h
 DECAY_H = 0.7 # Field decay ... gamma_h
-IMPACT_H = 0.1 # Impact of agent expressions on the field ... s
-# Note: This standard setting is later overruled by setting the constant to a
-# value that scales to the total number of agents in the simulations. Test runs
-# showed with s = 0.1 the model only behaves as expected with 150 agents.
+
+if len(sys.argv) > 3:
+    impct = float(sys.argv[3]) / AGENTS
+    sttn = float(sys.argv[4])
+else:
+    impct = 0.1
+    strtn = 1.0
+IMPACT_H = impct # Impact of agent expressions on the field ... s
+SAT_C = sttn # Saturation factor ... c
+# Note: Test runs showed with standard value s = 0.1 the model only behaves as
+# expected with 150 agents. Scaling is needed and can be set using arguments.
 
 ############
 # ENTITIES #
@@ -58,84 +79,72 @@ IMPACT_H = 0.1 # Impact of agent expressions on the field ... s
 class Agent:
     '''Class describing one agent instance and its state variables.'''
     def __init__(self):
-        self.baseline_v = np.random.normal(BASE_V, 0.1)
-        self.baseline_a = np.random.normal(BASE_A, 0.1)
+        self.bsln_v = np.random.normal(BASE_V, 0.1) # Valence baseline
+        self.bsln_a = np.random.normal(BASE_A, 0.1) # Arousal baseline
         # Note: Spread of the normal distrution should not cause valence or
         # arousal baselines to lie above 1 or below -1
-        self.valence = self.baseline_v
-        self.arousal = self.baseline_a
-        self.threshold = THRESH_A
-        self.history_v = []
-        self.history_a = []
+        self.vlnc = self.bsln_v # Setting initial valence to baseline value
+        self.arsl = self.bsln_a # Setting initial arousal to baseline value
+        self.thrshld = THRESH_A # Arousal threshold
+        self.hstry_v = [] # History of valence values at each time step
+        self.hstry_a = [] # History of arousal values at each time step
 
     def perception(self, field):
         '''Method changing the agent state variables given their perception of
         the field, using its state variable as input and adding stochasticity
         to global change coefficients'''
-        self.valence += field.sign_h * (COEFF_B0 +
-                                        COEFF_B1 * self.valence +
-                                        COEFF_B2 * self.valence ** 2 +
-                                        COEFF_B3 * self.valence ** 3)
-        self.arousal += field.absolute_h * (COEFF_D0 +
-                                            COEFF_D1 * self.arousal +
-                                            COEFF_D2 * self.arousal ** 2 +
-                                            COEFF_D3 * self.arousal ** 3)
+        self.vlnc += field.sgn * (COEFF_B0 +
+                                  COEFF_B1 * self.vlnc +
+                                  COEFF_B2 * self.vlnc ** 2 +
+                                  COEFF_B3 * self.vlnc ** 3)
+        self.arsl += field.abslt * (COEFF_D0 +
+                                    COEFF_D1 * self.arsl +
+                                    COEFF_D2 * self.arsl ** 2 +
+                                    COEFF_D3 * self.arsl ** 3)
         # Note: Coefficients B3 and D3 sometimes caused the program not to
         # execute during first test runs due to an "result too large" error.
 
         # Stochastic shocks triggering agent interaction:
-        stoch_v = np.random.randint(-100, 100) / 100
-        stoch_a = np.random.randint(-100, 100) / 100
-        self.valence += AMP_V * stoch_v
-        self.arousal += AMP_A * stoch_a
+        self.vlnc += AMP_V * np.random.uniform(-1, 1)
+        self.arsl += AMP_A * np.random.uniform(-1, 1)
 
     def expression(self):
         '''Method checking if an agent expresses its emotions, down-regulating
         them using global factors, and returning information whether it is
         a positive or negative emotion, or none at all.'''
-        if self.arousal >= self.threshold:
-            emotion = np.sign(self.valence) # Variable needed for scheduling!
-            self.valence = ((self.valence - self.baseline_v) * FACTOR_V
-                            + self.baseline_v)
-            self.arousal = ((self.arousal - self.baseline_a) * FACTOR_A
-                            + self.baseline_a)
+        if self.arsl >= self.thrshld:
+            emotion = np.sign(self.vlnc)
+            self.vlnc = ((self.vlnc - self.bsln_v) * FACTOR_V + self.bsln_v)
+            self.arsl = ((self.arsl - self.bsln_a) * FACTOR_A + self.bsln_a)
         else:
             emotion = None
 
         return emotion
 
-    def relaxation(self):
-        '''Method relaxing the emotions of an agent towards their respective
-        baselines, using the global decay parameter.'''
-        self.valence += (-1) * DECAY_V * (self.valence - self.baseline_v)
-        self.arousal += (-1) * DECAY_A * (self.arousal - self.baseline_a)
-
     def satiation(self):
         '''Method checking whether an agent drops out of the simulation given
         the current emotional state and returning a boolean value.'''
-        probability = np.absolute(self.arousal ** 2 * 100)
-        chance = np.random.randint(0, 100)
+        probability = np.absolute(self.arsl ** 2) * SAT_C
+        chance = np.random.uniform(0, 1)
         return bool(chance <= probability)
 
-        # Old version of the return statement:
-#        if chance <= probability:
-#            return True
-#        else:
-#            return False
+    def relaxation(self):
+        '''Method relaxing the emotions of an agent towards their respective
+        baselines, using the global decay parameter.'''
+        self.vlnc += -1 * DECAY_V * (self.vlnc - self.bsln_v)
+        self.arsl += -1 * DECAY_A * (self.arsl - self.bsln_a)
 
     def collect_data(self):
         '''Method collecting the agent state variables in a list.'''
-        self.history_v.append(round(self.valence, 2))
-        self.history_a.append(round(self.arousal, 2))
-        # Missing: What other data could be useful?
+        self.hstry_v.append(round(self.vlnc, 2))
+        self.hstry_a.append(round(self.arsl, 2))
 
 class Field:
     '''Class describing the communication field and its state variables'''
     def __init__(self):
-        self.absolute_h = CHARGE_H
-        self.sign_h = CHARGE_H
-        self.history = []
-        self.expressions = []
+        self.abslt = CHARGE_H # Absolute value of the charge of the field
+        self.sgn = CHARGE_H # Sign of the charge of the field
+        self.hstry_h = [self.abslt] # History of the field at each time step
 
     def communication(self, positive_expressions, negative_expressions):
         '''Method changing the field state variable using positive and
@@ -144,135 +153,136 @@ class Field:
         absolute_expressions = positive_expressions + negative_expressions
         sign_expressions = positive_expressions - negative_expressions
 
-        self.absolute_h += (-1 * DECAY_H * self.absolute_h +
-                            IMPACT_H * absolute_expressions)
-        self.sign_h += (-1 * DECAY_H * self.sign_h +
-                        IMPACT_H * sign_expressions)
+        self.abslt += (-1 * DECAY_H * self.abslt +
+                       IMPACT_H * absolute_expressions)
+        self.sgn += (-1 * DECAY_H * self.sgn +
+                     IMPACT_H * sign_expressions)
 
     def collect_data(self):
         '''Method collecting the field state variable in a list.'''
-        self.history.append(round(self.sign_h, 2))
+        self.hstry_h.append(round(self.sgn, 2))
 
-############
-# SCHEDULE #
-############
+##################
+# MODEL SCHEDULE #
+##################
 
-def start_simulation(time, agents):
-    '''Function starting the simulation and running the model using the number
-    of agents and the maximum number of time steps as arguments. Its output is
-    a dictionary using "valence", "arousal", and "field" as key to access
-    respective dataframes of the history of agent and field state variables.'''
-    global IMPACT_H
-    IMPACT_H = 15 / agents
-    # Note: Standard impact variable s = 0.1, but this way it scales to the
-    # number of agents in the simulation, allowing for collective emotions to
-    # emerge at any number of agents.
-    agent_list = [Agent() for agent in range(agents)]
-    field = Field()
-    histories_v = []
-    histories_a = []
-    history_f = []
-    history_n = []
-    history_pn = []
-    history_nn = []
-    history_agents = []
+class Model:
+    '''Class describing the initialization of one instance of a model run and
+    its schedule.'''
+    def __init__(self, agents):
+        self.actv_agnts = [Agent() for agent in range(agents)]
+        self.inctv_agnts = []
+        self.fld = Field()
+        self.hstry_A = [len(self.actv_agnts)]
+        self.hstry_N = [0]
+        self.tm_stps = [0]
 
-    # The simulation ends when all the agents dropped out, or when the maximum
-    # number of time steps was reached:
-    step = 0
-    while step < time and len(agent_list) >= 1:
-        step += 1
-        positive_expressions = 0
-        negative_expressions = 0
+    def schedule(self, timesteps):
+        '''Method scheduling the agent and field processes, including their
+        data collection and returning a data frame.'''
+        # The simulation ends when all the agents dropped out, or when the
+        # maximum number of time steps was reached:
+        step = 0
+        while step < timesteps and len(self.actv_agnts) > 0:
+            step += 1
+            # Keeping track of the number of expressions during each time step:
+            positive_expressions = 0
+            negative_expressions = 0
 
-        for agent in agent_list:
-#            agent.collect_data() # For exploration purposes, changes data
-            agent.perception(field)
-            # These if-elif statements force agent state variables to remain
-            # below 1 and above -1.
-#            if agent.valence > 1: agent.valence = 1
-#            elif agent.valence < -1: agent.valence = -1
-#            if agent.arousal > 1: agent.arousal = 1
-#            elif agent.arousal < -1: agent.arousal = -1
-            agent.collect_data()
-            # Note: Agent data is collected once per time step and this seems
-            # to be the most useful moment, because it captures the emotional
-            # high points of the agents.
-            emotion = agent.expression()
-            if emotion == 1:
-                positive_expressions += 1
-            elif emotion == -1:
-                negative_expressions += 1
-#            else:
-#                pass
-#            agent.collect_data() # For exploration purposes, changes data
-            if agent.satiation(): # Need to collect data before dropout
-                histories_v.append(agent.history_v)
-                histories_a.append(agent.history_a)
-                agent_list.remove(agent)
-#            else:
-#                pass
-            agent.relaxation()
+            for agent in self.actv_agnts:
+                agent.perception(self.fld)
+                agent.collect_data()
+                # Note: Agent data is collected once per time step and this
+                # seems to be the most useful moment, because it captures the
+                # emotional high points of the agents.
+                emotion = agent.expression()
+                if emotion == 1:
+                    positive_expressions += 1
+                elif emotion == -1:
+                    negative_expressions += 1
+                if agent.satiation():
+                    self.inctv_agnts.append(agent)
+                    self.actv_agnts.remove(agent)
+                agent.relaxation()
+
+            # After all the agents took their actions, the field is now
+            # updated:
+            self.fld.communication(positive_expressions, negative_expressions)
+            self.fld.collect_data()
+            # Collecting data for expressions, number of agents, and time:
+            self.hstry_A.append(len(self.actv_agnts))
+            self.hstry_N.append(positive_expressions + negative_expressions)
+            self.tm_stps.append(step)
             # Making sure the order the agents act in is not the same at every
             # time step by shuffling the agent list:
-            np.random.shuffle(agent_list)
+            np.random.shuffle(self.actv_agnts)
 
-        # After all the agents took their actions, the field is now updated:
-        field.communication(positive_expressions, negative_expressions)
-        field.collect_data()
-        history_pn.append(positive_expressions)
-        history_nn.append(negative_expressions)
-        history_agents.append(len(agent_list))
+        for agent in self.actv_agnts:
+            self.inctv_agnts.append(agent)
+            self.actv_agnts.remove(agent)
 
-    # All the individual agent histories are now stored in one large list:
-    for agent in agent_list:
-        histories_v.append(agent.history_v)
-        histories_a.append(agent.history_a)
+#####################
+# RUNNING THE MODEL #
+#####################
 
-    history_f.append(field.history)
-    history_n.append(history_pn)
-    history_n.append(history_nn)
+def run(runs, agents):
+    '''Function running the model with the input number of agents for the input
+    number of time steps, returning a clean dataframe of all model data,
+    including data on agent and field variables.'''
+    print("Starting " + str(runs) + " model run(s)... (agents="
+          + str(agents) + ", s=" + str(round(IMPACT_H, 2)) + ", c="
+           + str(SAT_C) + ")")
+    data = pd.DataFrame()
+    model_runs = [Model(agents) for model in range(runs)]
+    run = 0
+    dataset = pd.DataFrame()
+    for model in model_runs:
+        model.schedule(TIME)
+        for agent in model.inctv_agnts:
+            data = pd.DataFrame([pd.Series(agent.hstry_v, name="v"),
+                                pd.Series(agent.hstry_a, name="a")])
+            data = data.groupby(by=data.index, axis=0).mean()
 
-    # Creating a dictionary of agent and field data and respective dataframes:
-    data = {"valence": pd.DataFrame(histories_v),
-            "arousal": pd.DataFrame(histories_a),
-            "field": pd.DataFrame(history_f),
-            "expressions": pd.DataFrame(history_n),
-            "agents": pd.DataFrame(history_agents)}
-    return data
+        data = data.append([pd.Series([run], name="Run"),
+                            pd.Series([agents], name="Agents"),
+                            pd.Series(model.tm_stps, name="Step"),
+                            pd.Series([IMPACT_H], name="s"),
+                            pd.Series([SAT_C], name="c"),
+                            pd.Series(model.hstry_A, name="A"),
+                            pd.Series(model.hstry_N, name="N"),
+                            pd.Series(model.fld.hstry_h, name="h")])
+        data = data.transpose()[["Run", "Agents", "s", "c", "Step",
+                                 "v", "a", "A", "N","h"]]
+        data[["Agents", "Run",
+              "s", "c"]] = data[["Agents", "Run",
+                                 "s", "c"]].ffill()
+        run +=1
+        dataset = dataset.append(data, ignore_index=True)
 
-def analyze_data(data):
-    '''Function analyzing the input simulation results and producing plots of
-    the mean values of the agent state variables and the field state variable
-    over time.'''
-    valence_plot = data["valence"].mean().transpose().plot(color="#1f77b4")
-    valence_plot.set(xlabel="Time".capitalize())
-#    valence_plot.legend(["Agent valence"])
+    print("...model run(s) complete!")
+    global FILENAME
+    FILENAME = str("data/cyberemotions-" + str(runs) + "x" + "-agents="
+                   + str(agents) + ",s=" + str(round(IMPACT_H, 2))
+                   + ",c=" + str(SAT_C) + "-" + str(int(time.time()))
+                   + ".feather")
+    # Note: Using an Unix timestamp to guarantee unique file names to avoid
+    # overwriting old results of same settings simulations.
+    return dataset
 
-    arousal_plot = data["arousal"].mean().transpose().plot(color="#d62728")
-#    arousal_plot.set(xlabel="Time".capitalize())
-    arousal_plot.legend(["Agent valence", "Agent arousal"])
-    # Note: Cannot figure out why in this case both valence and arousal are
-    # only part of the same plot when using mean() before transpose().
-    plt.figure()
-
-    field_plot = data["field"].transpose().plot(color="#2ca02c")
-#    field_plot.set(xlabel="Time".capitalize())
-    field_plot.legend(["Field charge"])
-    plt.figure()
-
-    n_positive_plot = data["expressions"].loc[0].transpose().plot(color="#1f77b4")
-    n_positive_plot.set(xlabel="Time".capitalize())
-    n_negative_plot = data["expressions"].loc[1].transpose().plot(color="#d62728")
-#    n_negative_plot.set(xlabel="Time".capitalize())
-    n_negative_plot.legend(["Positive expressions", "Negative expressions"])
-    plt.figure()
-
-    agents_plot = data["agents"].plot(color="#2ca02c")
-    agents_plot.legend(["Number of agents"])
-    plt.figure()
-
-
-# Running the model and illustrating its results:
 if __name__ == "__main__":
-	analyze_data(start_simulation(TIME, AGENTS))
+    DATA = run(MODEL_RUNS, AGENTS)
+
+####################
+# STORING THE DATA #
+####################
+
+def save(data, filename):
+    '''Function to save a dataframe to a feather file, accepting the collected
+    model data and a filename as input. Note: A global filename is generated by
+    the run function that includes model settings and parameters.'''
+    print("Saving model data... (filename: " + filename + ")")
+    data.to_feather(filename)
+    print("...saving successful!")
+
+if __name__ == "__main__":
+    save(DATA, FILENAME)
