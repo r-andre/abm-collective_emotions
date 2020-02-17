@@ -9,7 +9,7 @@
 # run, and the pyarrow package to save the output data as a feather file.
 # a = Number of model runs
 # b = Number agents
-# c = Impact parameter (note: will be divided by the number of agents, s = c/a)
+# c = Impact parameter (note: can be divided by the number of agents, s = c/a)
 # d = Satiation factor
 
 for a in 100 # Model runs
