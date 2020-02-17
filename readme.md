@@ -1,20 +1,39 @@
 # Agent-Based Modeling of Collective Emotions: Implementing the Cyberemotions Framework
 
-This repository contains an implementation of the _Cyberemotions_ agent-based modeling framework in Python (version 3.7) that abstracts the emergence of collective emotions and the spread of emotional information in social media.
+This repository contains an implementation of the _Cyberemotions_ agent-based modeling framework in Python (version 3.7) that abstracts the emergence of collective emotions and the spread of emotional information in online discussions, following the formalization of [Garcia et al. (2016)](http://dx.doi.org/10.1098/rsos.160059).
 
-An extensive report and documentation of the model using the _ODD protocol standard_ (Overview, Design concepts, Details) can be found in `protocol.pdf`.
+An extensive technical report and documentation of the model using the _ODD_ (overview, design concepts, details) protocol standard for agent-based modeling can be found in `protocol.pdf`.
+
+The `exploration.ipynb` notebook gives a very short overview into the results of the implemented model, but does not constitute a full analysis of the model data. (We used it primarily to experiment with model parameters to find the setting that produces the most realistic results measured in expressions per agent, specifically adjusting impact factor `s` and satiation factor `c`.)
 
 ## How it works
 
-A simulation of the Cyberemotions model can be started by running `model.py` directly or by using the `run.sh` script. Run `run()` function can also be used to start the model after being imported. In addition, the attached Jupyter notebook file allows for a model overview and experimentation with parameters.
+A simulation using the Cyberemotions model can be started by running `model.py` directly or by using the bash `run.sh` script to run the model multiple times at different settings. The `run()` function can also be used to start the model after being imported. This model takes either four arguments that are further passed into this function: 1. the number of model runs, 2. the number of agents, 3. the impact factor, and 4. the satiation factor. 
+For example, the model can be started from the Windows command line using:
+`python model.py number_of_runs number_of_agents impact_factor satiation_factor`
+Likewise, it can be imported and run inside Python:
+`import model
+run(number_of_runs, number_of_agents, impact_factor, satiation_factor)`
+If no arguments are provided, the model is run with the standard settings and the standard parameters listed below.
 
-The model takes none, two, or four arguments as input, namely (a) number of model runs, (b) number of agents, (c) impact parameter, and (d) satiation factor. These are further passed into the _run_ function. If no arguments are provided, the model is run with the standard settings and the standard parameters listed below.
+In addition, the model can be run inside a Jupyter environment using `model.ipynb` that allows for a model overview and experimentation with parameters.
 
-The _run_ script allows for running the model a set number of time using different input vaiables.
+### Dependencies
+The model requires the pandas and numpy packages to run, and the pyarrow package to save its data (stored in a dataframe) as a feather file.
 
-**Dependencies:** The model requires the pandas and numpy packages to run, and the pyarrow package to save its data (stored in a dataframe) as a feather file.
+### Saving the model data
 
-### Model parameters
+Running `model.py` directly or using the bash script will store the collected data in the `\data` folder in separate feather files for each model setting containing the following information in their filenames: 1. number of runs, 2. number of agents, impact parameter, satiation factor, UNIX timestamp. (For 100 model runs, one file has the approximate size of 600kb, depending on how long the model is running for.)
+
+Each feather file contains a dataframe summarizing the model data in the following manner, with each row constituting one time step of a model run:
+
+| Run | Agents | s | c | Step | v | a | A | N | h |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Model run | Initial agents | Impact parameter | Satiation parameter | Timestep | Agent valence | Agent arousal | Active agents | Expressions | Field charge |
+
+Likewise, the `model.run()` function generates the very same dataframe for all runs at a given setting.
+
+## Model parameters
 
 The standard model parameters are hardcoded, unless otherwise specified above, as follows:
 
@@ -42,13 +61,4 @@ The standard model parameters are hardcoded, unless otherwise specified above, a
 | Field decay | *&gamma;<sub>h</sub>* | 0.7 | DECAY_H |
 | Field impact | *s* | 0.1 | IMPACT_H |
 
-
-### Saving the model data
-
-Running `model.py` directly or using the script will store the collected data in the `\data` folder in seperate feather files for each model setting with the following filename schema: `cyberemotions-[number of runs]x-agents=[number of agents]-s=[impact parameter]-c=[satiation factor]-[UNIX timestamp].feather`
-
-The feather file contains a dataframe summarizing the model data in the following manner, with each row constituting one time step of a model run:
-
-| Run | Agents | s | c | Step | v | a | A | N | h |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Model run | Initial agents | Impact parameter | Satiation parameter | Timestep | Agent valence | Agent arousal | Active agents | Expressions | Field charge |
+At this stage, this model is primarily used to experiment with model parameters to generate realistic results. The key parameters are satiation factor `c` and impact factor `s` that can accordingly be input using arguments. All other parameters constitute hard-coded constants.
