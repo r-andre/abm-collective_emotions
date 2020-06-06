@@ -20,19 +20,9 @@ no_steps = 150
 # time steps, and hence this should be an appropriate
 # maximum that does not cause premature abortion of a run
 
-if __name__ == "__main__" and '__file__' in globals():
-    if len(sys.argv) > 2:
-        no_runs = int(sys.argv[1])
-        no_agents = int(sys.argv[2])
-        no_steps = 150
-
 MODEL_RUNS = no_runs  # Number of times the model is run
 AGENTS = no_agents  # Number of agents at the start of the simulation
 TIME = no_steps  # Maximum number of time steps before the simulation ends
-
-####################
-# MODEL PARAMETERS #
-####################
 
 BASE_V = 0.056  # Valence baseline ... b
 BASE_A = -0.442  # Arousal baseline ... d
@@ -118,6 +108,9 @@ class Agent(object):
         self.vlnc += dt * (self.f_v(field) + AMP_V * self.xi_v)
         self.arsl += dt * (self.f_a(field) + AMP_A * self.xi_a)
 
+        self.hstry_v.append(round(self.vlnc, 2))
+        self.hstry_a.append(round(self.arsl, 2))
+
     def expression(self):
         """
         Method checking if an agent expresses its emotions, down-regulating
@@ -150,13 +143,6 @@ class Agent(object):
         self.vlnc += -1 * DECAY_V * (self.vlnc - self.bsln_v)
         self.arsl += -1 * DECAY_A * (self.arsl - self.bsln_a)
 
-    def collect_data(self):
-        """
-        Method collecting the agent state variables in a list.
-        """
-        self.hstry_v.append(round(self.vlnc, 2))
-        self.hstry_a.append(round(self.arsl, 2))
-
 
 class Field(object):
     """
@@ -182,10 +168,6 @@ class Field(object):
         self.sgn += (-1 * DECAY_H * self.sgn +
                      impct * sign_expressions)
 
-    def collect_data(self):
-        """
-        Method collecting the field state variable in a list.
-        """
         self.hstry_h.append(round(self.sgn, 2))
 
 
@@ -219,7 +201,6 @@ class Model(object):
 
             for agent in self.actv_agnts:
                 agent.perception(self.fld)
-                agent.collect_data()
                 # Note: Agent data is collected once per time step and this
                 # seems to be the most useful moment, because it captures the
                 # emotional high points of the agents.
@@ -238,7 +219,7 @@ class Model(object):
             self.fld.communication(positive_expressions,
                                    negative_expressions,
                                    impct)
-            self.fld.collect_data()
+
             # Collecting data for expressions, number of agents, and time:
             self.hstry_A.append(len(self.actv_agnts))
             self.hstry_N.append(positive_expressions + negative_expressions)
@@ -334,6 +315,10 @@ def visualize(data):
 
 
 if __name__ == "__main__" and '__file__' in globals():
+    if len(sys.argv) > 2:
+        MODEL_RUNS = int(sys.argv[1])
+        AGENTS = int(sys.argv[2])
+
     DATA = run(MODEL_RUNS, AGENTS, IMPACT_H, SAT_C)
     save(DATA, FILENAME)
     visualize(DATA)
