@@ -71,13 +71,13 @@ if __name__ == "__main__" and '__file__' in globals():
 
 IMPACT_H = impct  # Impact of agent expressions on the field ... s
 SAT_C = sttn  # Saturation factor ... c
+dt = 1.0
 
 
 class Agent(object):
     """
     Class describing one agent instance and its state variables.
     """
-
     def __init__(self):
         self.bsln_v = np.random.normal(BASE_V, 0.1)  # Valence baseline
         self.bsln_a = np.random.normal(BASE_A, 0.1)  # Arousal baseline
@@ -89,29 +89,34 @@ class Agent(object):
         self.hstry_v = []  # History of valence values at each time step
         self.hstry_a = []  # History of arousal values at each time step
 
+    def f_v(self, field):
+        return field.sgn * (COEFF_B0 +
+                            COEFF_B1 * self.vlnc +
+                            round((COEFF_B2 * self.vlnc), 9) ** 2 +
+                            round((COEFF_B3 * self.vlnc), 9) ** 3)
+
+    def f_a(self, field):
+        return field.abslt * (COEFF_D0 +
+                              COEFF_D1 * self.arsl +
+                              round((COEFF_D2 * self.arsl), 9) ** 2 +
+                              round((COEFF_D3 * self.arsl), 9) ** 3)
+
+    @property
+    def xi_v(self):
+        return np.random.uniform(-1, 1)
+
+    @property
+    def xi_a(self):
+        return np.random.uniform(-1, 1)
+
     def perception(self, field):
         """
         Method changing the agent state variables given their perception of
         the field, using its state variable as input and adding stochasticity
         to global change coefficients
         """
-        self.vlnc += field.sgn * (COEFF_B0 +
-                                  COEFF_B1 * self.vlnc +
-                                  round((COEFF_B2 * self.vlnc), 9) ** 2 +
-                                  round((COEFF_B3 * self.vlnc), 9) ** 3)
-
-        self.arsl += field.abslt * (COEFF_D0 +
-                                    COEFF_D1 * self.arsl +
-                                    round((COEFF_D2 * self.arsl), 9) ** 2 +
-                                    round((COEFF_D3 * self.arsl), 9) ** 3)
-
-        # Note: Coefficients B3 and D3 sometimes caused the program not to
-        # execute during first test runs due to an "result too large" error,
-        # hence the round function was necessary.
-
-        # Stochastic shocks triggering agent interaction:
-        self.vlnc += AMP_V * np.random.uniform(-1, 1)
-        self.arsl += AMP_A * np.random.uniform(-1, 1)
+        self.vlnc += dt * (self.f_v(field) + AMP_V * self.xi_v)
+        self.arsl += dt * (self.f_a(field) + AMP_A * self.xi_a)
 
     def expression(self):
         """
@@ -297,10 +302,6 @@ def run(runs, agents, impct=IMPACT_H, sttn=SAT_C):
     return dataset
 
 
-if __name__ == "__main__" and '__file__' in globals():
-    DATA = run(MODEL_RUNS, AGENTS, IMPACT_H, SAT_C)
-
-
 def save(data, filename):
     """
     Function to save a dataframe to a feather file, accepting the collected
@@ -310,10 +311,6 @@ def save(data, filename):
     print("Saving model data... (filename: {0} )".format(filename))
     data.to_feather(filename)
     print("...saving successful!")
-
-
-if __name__ == "__main__" and '__file__' in globals():
-    save(DATA, FILENAME)
 
 
 def visualize(data):
@@ -334,3 +331,9 @@ def visualize(data):
     df.plot(y="N", xlim=(0, 50), c="m", grid=True, label="Expressions", ax=ax2)
 
     plt.show()
+
+
+if __name__ == "__main__" and '__file__' in globals():
+    DATA = run(MODEL_RUNS, AGENTS, IMPACT_H, SAT_C)
+    save(DATA, FILENAME)
+    visualize(DATA)
