@@ -321,4 +321,4 @@ if __name__ == "__main__" and '__file__' in globals():
 
     DATA = run(MODEL_RUNS, AGENTS, IMPACT_H, SAT_C)
     save(DATA, FILENAME)
-    visualize(DATA)
+    # visualize(DATA)
